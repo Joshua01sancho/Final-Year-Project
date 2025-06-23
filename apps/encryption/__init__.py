@@ -1,0 +1,1 @@
+# Encryption app for E-Voting System 

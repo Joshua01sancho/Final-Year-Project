@@ -1,0 +1,1 @@
+# This file makes the 'elections' app a Python package. 

@@ -1,0 +1,123 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}{{ block.super }}
+<script type="text/javascript" src="{% url 'admin:jsi18n' %}"></script>
+{{ form.media }}
+{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+<link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+<style>
+    .face-upload-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .user-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    .upload-form {
+        margin-top: 20px;
+    }
+    .file-input {
+        margin: 10px 0;
+    }
+    .submit-button {
+        background: #79aec8;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .submit-button:hover {
+        background: #417690;
+    }
+    .existing-data {
+        background: #e8f5e8;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 20px;
+    }
+    .face-attributes {
+        background: #f0f0f0;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:voters_voter_changelist' %}">Voters</a>
+&rsaquo; <a href="{% url 'admin:voters_voter_change' user.id %}">{{ user.username }}</a>
+&rsaquo; Upload Face Image
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="face-upload-container">
+    <h1>Upload Face Image for {{ user.username }}</h1>
+    
+    <div class="user-info">
+        <h3>User Information</h3>
+        <p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+        <p><strong>Email:</strong> {{ user.email }}</p>
+        <p><strong>Username:</strong> {{ user.username }}</p>
+        <p><strong>Blockchain Address:</strong> {{ user.blockchain_address|default:"Not set" }}</p>
+    </div>
+
+    {% if biometric_data %}
+    <div class="existing-data">
+        <h3>Existing Face Data</h3>
+        <p><strong>Face ID:</strong> {{ biometric_data.face_id }}</p>
+        <p><strong>Created:</strong> {{ biometric_data.created_at }}</p>
+        
+        {% if biometric_data.face_features %}
+        <div class="face-attributes">
+            <h4>Face Attributes:</h4>
+            <p><strong>Age:</strong> {{ biometric_data.face_features.age|default:"N/A" }}</p>
+            <p><strong>Gender:</strong> {{ biometric_data.face_features.gender|default:"N/A" }}</p>
+            <p><strong>Glasses:</strong> {{ biometric_data.face_features.glasses|default:"N/A" }}</p>
+            <p><strong>Smile:</strong> {{ biometric_data.face_features.smile|default:"N/A" }}</p>
+        </div>
+        {% endif %}
+        
+        <p><em>Uploading a new image will replace the existing face data.</em></p>
+    {% else %}
+        <p><em>No face data found for this user. Upload an image to register their face.</em></p>
+    {% endif %}
+
+    <div class="upload-form">
+        <h3>Upload New Face Image</h3>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="file-input">
+                <label for="face_image"><strong>Select Image:</strong></label><br>
+                <input type="file" id="face_image" name="face_image" accept="image/*" required>
+                <p class="help">Please select a clear image of the user's face. The image should be well-lit and show the face clearly.</p>
+            </div>
+            
+            <button type="submit" class="submit-button">
+                {% if biometric_data %}Update Face Data{% else %}Upload Face Image{% endif %}
+            </button>
+        </form>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <a href="{% url 'admin:voters_voter_change' user.id %}" class="button">← Back to User</a>
+        <a href="{% url 'admin:voters_biometricdata_changelist' %}" class="button">View All Biometric Data</a>
+    </div>
+</div>
+{% endblock %} 

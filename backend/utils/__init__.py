@@ -1,0 +1,1 @@
+# Utility functions for E-Voting System 

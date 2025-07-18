@@ -1,5 +1,9 @@
-"node_modules/" 
-node_modules/ 
-node_modules/ 
-node_modules
-.next/ 
+# Node.js
+node_modules/
+.next/
+
+# Optional: Ignore environment variables and logs
+.env
+.env.local
+npm-debug.log*
+yarn-error.log*

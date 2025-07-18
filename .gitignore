@@ -1,9 +1,53 @@
-# Node.js
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# Node / Next.js
 node_modules/
 .next/
 
-# Optional: Ignore environment variables and logs
+# PostgreSQL dumps
+*.sql
+*.dump
+*.backup
+
+# Environment config files
 .env
-.env.local
-npm-debug.log*
-yarn-error.log*
+*.env
+
+# macOS and Windows system files
+.DS_Store
+Thumbs.db
+
+# Python virtual environments
+venv/
+backend/venv/
+E-Voting System/venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Django logs and static files
+*.sqlite3
+*.log
+backend/logs/
+backend/static/
+backend/media/
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+
+# Compiled contracts and blockchain artifacts
+truffle/build/
+truffle/contracts/*.abi
+truffle/contracts/*.bin
+
+# Misc
+*.bak
+*.tmp

@@ -228,7 +228,6 @@ def face_signup(request):
         VoterProfile.objects.create(
             user=user,
             is_verified=True,
-            verification_method='face_recognition',
             national_id=''  # Set empty for now, can be updated later
         )
         
@@ -301,11 +300,14 @@ def traditional_login(request):
 def traditional_signup(request):
     """Handle traditional user registration - Debug mode: return full error trace"""
     try:
+        print('DEBUG: traditional_signup called')
+        print('DEBUG: request.data =', dict(request.data))
         username = request.data.get('username', 'testuser')
         email = request.data.get('email', 'test@example.com')
         password = request.data.get('password', 'testpass123')
         first_name = request.data.get('firstName', 'Test')
         last_name = request.data.get('lastName', 'User')
+        print(f'DEBUG: username={username}, email={email}, password={password}, first_name={first_name}, last_name={last_name}')
         
         # Generate unique username if not provided
         if not username or username == 'testuser':
@@ -338,7 +340,6 @@ def traditional_signup(request):
             VoterProfile.objects.create(
                 user=user,
                 is_verified=True,  # Mark as verified for testing
-                verification_method='traditional',
                 national_id='TEST' + str(user.id)  # Use a unique test ID
             )
         except Exception as profile_error:

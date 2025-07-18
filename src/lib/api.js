@@ -84,9 +84,8 @@ class ApiClient {
   }
 
   async signupWithCredentials(userData) {
-    // Remove blockchainAddress if present
-    const { blockchainAddress, ...rest } = userData;
-    const response = await this.client.post('/auth/signup/', rest);
+    // Do not remove blockchainAddress; send it to the backend
+    const response = await this.client.post('/auth/signup/', userData);
     return response.data;
   }
 
@@ -112,7 +111,7 @@ class ApiClient {
   }
 
   async getElection(id) {
-    const response = await this.client.get(`/elections/${id}`);
+    const response = await this.client.get(`/elections/${id}/`); // <-- add trailing slash
     return response.data;
   }
 
@@ -122,12 +121,12 @@ class ApiClient {
   }
 
   async updateElection(id, electionData) {
-    const response = await this.client.put(`/admin/elections/${id}`, electionData);
+    const response = await this.client.put(`/admin/elections/${id}/`, electionData); // <-- add trailing slash
     return response.data;
   }
 
   async deleteElection(id) {
-    const response = await this.client.delete(`/admin/elections/${id}`);
+    const response = await this.client.delete(`/admin/elections/${id}/`); // <-- add trailing slash
     return response.data;
   }
 

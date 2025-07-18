@@ -22,14 +22,9 @@ User = get_user_model()
 
 # ViewSets for routers
 class ElectionViewSet(viewsets.ModelViewSet):
-    queryset = Election.objects.all()
+    queryset = Election.objects.filter(is_public=True)
     serializer_class = ElectionSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-
-    def get_queryset(self):
-        if self.request.user.is_staff:
-            return Election.objects.all()
-        return Election.objects.filter(is_public=True)
+    permission_classes = [permissions.AllowAny]
 
 class CandidateViewSet(viewsets.ModelViewSet):
     queryset = Candidate.objects.all()
@@ -78,7 +73,39 @@ class BiometricDataViewSet(viewsets.ModelViewSet):
 class ElectionResultView(generics.RetrieveAPIView):
     queryset = ElectionResult.objects.all()
     serializer_class = ElectionResultSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+        from apps.elections.models import Election, Candidate, ElectionResult
+        try:
+            # Get the election and its result
+            election = Election.objects.get(pk=pk)
+            result = ElectionResult.objects.get(election=election)
+            # Get all candidates for this election
+            candidates = election.get_candidates()
+            # Get candidate results (dict of candidate_id: vote_count)
+            candidate_results = result.candidate_results or {}
+            # Build results list
+            results = []
+            for candidate in candidates:
+                votes = candidate_results.get(str(candidate.id), 0)
+                results.append({
+                    'candidate': candidate.name,
+                    'votes': votes
+                })
+            # Find winner(s)
+            max_votes = max([r['votes'] for r in results], default=0)
+            winners = [r['candidate'] for r in results if r['votes'] == max_votes and max_votes > 0]
+            return Response({
+                'election': election.title,
+                'results': results,
+                'total_votes': result.total_votes,
+                'winners': winners
+            })
+        except Election.DoesNotExist:
+            return Response({'error': 'Election not found'}, status=404)
+        except ElectionResult.DoesNotExist:
+            return Response({'error': 'Election result not found'}, status=404)
 
 class ElectionDecryptView(APIView):
     permission_classes = [IsElectionManager]
@@ -138,10 +165,20 @@ def cast_vote(request):
         "candidate_id": "string"
     }
     """
+    from apps.elections.models import Election  # Ensure Election is always in scope
     try:
+        # Debug logging for user info
+        print(f"[DEBUG] cast_vote called by user: id={request.user.id}, username={request.user.username}, blockchain_address={getattr(request.user, 'blockchain_address', None)}")
+        # Check for blockchain address and private key
+        if not getattr(request.user, 'blockchain_address', None):
+            return Response({'error': 'User has no blockchain address assigned.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not getattr(request.user, 'blockchain_private_key', None):
+            return Response({'error': 'User has no blockchain private key assigned.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         # Validate request data
         election_id = request.data.get('election_id')
         candidate_id = request.data.get('candidate_id')
+        vote_value = int(candidate_id)  # Ensure vote_value is defined before use
         
         if not election_id or not candidate_id:
             return Response(
@@ -171,15 +208,11 @@ def cast_vote(request):
         paillier = PaillierEncryption(key_size=512)
         vote_encryption = VoteEncryption()
         
-        # For now, we'll use a simple key pair. In production, this should be
-        # generated during election setup and distributed securely
-        key_pair = paillier.generate_key_pair()
-        
-        # Convert candidate_id to integer for encryption
-        vote_value = int(candidate_id)
-        
+        # Use the election's stored public key for encryption
+        election_obj = Election.objects.get(id=election_id)
+        public_key = (int(election_obj.public_key_n), int(election_obj.public_key_g))
         # Encrypt the vote using Paillier
-        encrypted_vote = vote_encryption.encrypt_vote(vote_value, key_pair.public_key)
+        encrypted_vote = vote_encryption.encrypt_vote(vote_value, public_key)
         
         # Convert encrypted vote to hex for blockchain storage
         encrypted_vote_hex = hex(encrypted_vote)[2:]  # Remove '0x' prefix
@@ -222,21 +255,43 @@ def cast_vote(request):
             encrypted_vote=encrypted_vote_hexstr,  # Pass as hex string
             vote_hash=vote_hash_hexstr             # Pass as hex string
         )
-        
+
         if not success:
             return Response(
                 {'error': f'Failed to cast vote: {tx_hash}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        # Save the vote in the database (link to user for now, anonymize after tally)
+        import json
+        try:
+            election_obj = Election.objects.get(id=election_id)
+            Vote.objects.create(
+                election=election_obj,
+                voter=request.user,
+                encrypted_vote_data=json.dumps({
+                    "encrypted_vote": encrypted_vote_hexstr,
+                    "candidate_id": candidate_id
+                }),
+                vote_hash=vote_hash_hexstr[2:] if vote_hash_hexstr.startswith('0x') else vote_hash_hexstr,  # Remove 0x prefix
+                blockchain_tx_hash=tx_hash,
+                is_valid=True,
+                validation_errors=[]
+            )
+        except Exception as vote_error:
+            return Response(
+                {'error': f'Failed to save vote: {vote_error}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
         return Response({
             'message': 'Vote cast successfully with Paillier encryption',
             'transaction_hash': tx_hash,
             'vote_hash': vote_hash_bytes.hex(),
             'encryption_info': {
                 'method': 'Paillier',
-                'public_key_n': str(key_pair.public_key[0]),
-                'public_key_g': str(key_pair.public_key[1])
+                'public_key_n': str(public_key[0]),
+                'public_key_g': str(public_key[1])
             }
         })
         

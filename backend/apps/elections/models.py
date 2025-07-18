@@ -44,8 +44,10 @@ class Election(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     # Encryption keys
-    public_key_n = models.BigIntegerField(null=True, blank=True)
-    public_key_g = models.BigIntegerField(null=True, blank=True)
+    public_key_n = models.TextField(null=True, blank=True)
+    public_key_g = models.TextField(null=True, blank=True)
+    private_key_lambda = models.TextField(null=True, blank=True)  # Paillier private key (lambda)
+    private_key_mu = models.TextField(null=True, blank=True)      # Paillier private key (mu)
     private_key_shares = models.JSONField(default=list, blank=True)  # Distributed key shares
     
     # Configuration
@@ -158,7 +160,13 @@ class Vote(models.Model):
     """Model for storing encrypted votes"""
     
     election = models.ForeignKey(Election, on_delete=models.CASCADE, related_name='votes')
-    voter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='votes')
+    voter = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='votes'
+    )
     
     # Encrypted vote data
     encrypted_vote_data = models.TextField()  # JSON string of encrypted vote
@@ -197,7 +205,7 @@ class Vote(models.Model):
         ]
     
     def __str__(self):
-        return f"Vote by {self.voter.username} in {self.election.title}"
+        return f"Anonymous vote in {self.election.title}"
     
     @property
     def is_confirmed(self):

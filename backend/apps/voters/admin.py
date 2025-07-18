@@ -6,6 +6,10 @@ from django.http import HttpResponseRedirect
 from django.contrib import messages
 from django import forms
 from .models import Voter, VoterProfile, BiometricData
+from django.contrib.auth import get_user_model
+from web3 import Web3
+
+User = get_user_model()
 
 class BiometricDataForm(forms.ModelForm):
     """Custom form for BiometricData to handle encrypted fields"""
@@ -31,29 +35,14 @@ class BiometricDataForm(forms.ModelForm):
         return instance
 
 @admin.register(Voter)
-class VoterAdmin(UserAdmin):
-    list_display = ('username', 'email', 'first_name', 'last_name', 'blockchain_address', 'has_face_data', 'is_active', 'date_joined')
+class VoterAdmin(admin.ModelAdmin):
+    list_display = ('username', 'email', 'blockchain_address', 'blockchain_private_key', 'is_active', 'date_joined')
+    fields = ('username', 'email', 'blockchain_address', 'blockchain_private_key', 'is_active', 'date_joined', 'last_login', 'groups', 'user_permissions')
+    readonly_fields = ('date_joined', 'last_login')
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'date_joined')
     search_fields = ('username', 'email', 'first_name', 'last_name', 'blockchain_address')
     ordering = ('-date_joined',)
     actions = ['view_registration_stats', 'verify_voters', 'unverify_voters']
-    
-    fieldsets = UserAdmin.fieldsets + (
-        ('Blockchain Information', {
-            'fields': ('blockchain_address',)
-        }),
-        ('Face Recognition Note', {
-            'fields': (),
-            'description': 'Users register their own face data during signup for privacy. Admins cannot upload face images.',
-            'classes': ('collapse',)
-        }),
-    )
-    
-    add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Blockchain Information', {
-            'fields': ('blockchain_address',)
-        }),
-    )
     
     def has_face_data(self, obj):
         return BiometricData.objects.filter(user=obj, biometric_type='face', face_id__isnull=False).exists()

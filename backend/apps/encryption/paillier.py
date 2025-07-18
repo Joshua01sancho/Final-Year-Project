@@ -33,7 +33,7 @@ class PaillierEncryption:
     """Main class for Paillier encryption operations"""
     
     def __init__(self, key_size: int = None):
-        self.key_size = key_size or settings.PAILLIER_KEY_SIZE
+        self.key_size = key_size or 512  # Default to 512 bits
     
     def generate_key_pair(self) -> PaillierKeyPair:
         """

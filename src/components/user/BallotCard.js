@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Vote, Clock, CheckCircle, AlertCircle, Users, Calendar, Circle, User } from 'lucide-react';
 
-const BallotCard = ({ election }) => {
+const BallotCard = ({ election, onVote, onVerifyVote }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'active':
@@ -51,14 +51,17 @@ const BallotCard = ({ election }) => {
   };
 
   const getVoteButton = () => {
-    if (election.status === 'active' && !election.hasVoted) {
+    // Check if user has voted (this will be handled by the backend)
+    const hasVoted = election.has_voted || false;
+    
+    if (election.status === 'active' && !hasVoted) {
       return (
         <Link href={`/user/vote/${election.id}`} className="btn-primary w-full">
           <Vote className="h-4 w-4 mr-2" />
           Vote Now
         </Link>
       );
-    } else if (election.status === 'active' && election.hasVoted) {
+    } else if (election.status === 'active' && hasVoted) {
       return (
         <div className="flex items-center justify-center text-success-600 bg-success-50 px-4 py-2 rounded-lg">
           <CheckCircle className="h-4 w-4 mr-2" />
@@ -80,6 +83,14 @@ const BallotCard = ({ election }) => {
         </Link>
       );
     }
+  };
+
+  // Helper to get candidate name by ID
+  const getCandidateName = (candidateId) => {
+    if (!election.candidates) return candidateId;
+    const candidate = election.candidates.find(c => c.id === candidateId);
+    if (!candidate) return candidateId;
+    return `${candidate.name}${candidate.party ? ' (' + candidate.party + ')' : ''}`;
   };
 
   return (
@@ -113,19 +124,19 @@ const BallotCard = ({ election }) => {
         
         <div className="flex items-center text-sm text-gray-600">
           <Users className="h-4 w-4 mr-2" />
-          <span>{election.totalCandidates} candidates</span>
+          <span>{election.candidates?.length || 0} candidates</span>
         </div>
 
         <div className="flex items-center text-sm text-gray-600">
           <Vote className="h-4 w-4 mr-2" />
-          <span className="capitalize">{election.type} choice</span>
+          <span className="capitalize">{election.election_type || 'single'} choice</span>
         </div>
       </div>
 
       {/* Instructions */}
       <div className="bg-gray-50 rounded-lg p-3 mb-6">
         <p className="text-sm text-gray-700">
-          <strong>Instructions:</strong> {election.instructions}
+          <strong>Instructions:</strong> Select {election.max_choices || 1} candidate{(election.max_choices || 1) > 1 ? 's' : ''} for this {election.election_type || 'single'} choice election.
         </p>
       </div>
 
@@ -134,13 +145,29 @@ const BallotCard = ({ election }) => {
         {getVoteButton()}
       </div>
 
-      {/* Additional Info */}
-      {election.hasVoted && (
+      {/* Additional Info: Show voted candidate(s) if present */}
+      {election.has_voted && election.voted_candidate && (
         <div className="mt-4 pt-4 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Your vote status:</span>
-            <span className="text-success-600 font-medium">✓ Submitted</span>
+            <span className="text-gray-600">You voted for:</span>
+            <span className="text-primary-700 font-medium">
+              {Array.isArray(election.voted_candidate)
+                ? election.voted_candidate.map(getCandidateName).join(', ')
+                : getCandidateName(election.voted_candidate)}
+            </span>
           </div>
+          {election.vote_hash && (
+            <div className="flex items-center justify-between text-xs mt-2">
+              <span className="text-gray-400">Vote Hash:</span>
+              <span className="font-mono text-gray-500">{election.vote_hash}</span>
+            </div>
+          )}
+          {election.blockchain_tx_hash && (
+            <div className="flex items-center justify-between text-xs mt-1">
+              <span className="text-gray-400">Blockchain TX:</span>
+              <span className="font-mono text-gray-500">{election.blockchain_tx_hash}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

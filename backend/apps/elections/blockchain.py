@@ -3,6 +3,15 @@ import os
 from web3 import Web3
 from django.conf import settings
 from datetime import datetime
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+def get_private_key_for_user(address):
+    try:
+        user = User.objects.get(blockchain_address__iexact=address)
+        return user.blockchain_private_key
+    except User.DoesNotExist:
+        raise Exception(f"No user found with blockchain address {address}")
 
 class BlockchainService:
     def __init__(self):
@@ -26,10 +35,8 @@ class BlockchainService:
             abi=self.contract_abi
         )
         
-        # Get admin account - use the account that corresponds to our private key
-        # The private key 0x0ed17026394b4281656acc55a667c779fe602966a48596a8148076ad043c81f5
-        # corresponds to account 2: 0xff26aef8e8315c2cd84846a3e4312f2d71b51a7e
-        self.admin_account = self.w3.eth.accounts[2]  # Use account 2 instead of 0
+        # Set admin account from ADMIN_PRIVATE_KEY using from_key
+        self.admin_account = Web3().eth.account.from_key(settings.ADMIN_PRIVATE_KEY).address
         print(f"DEBUG: Admin account = {self.admin_account}")
         
     def create_election(self, election_id, title, start_time, end_time):
@@ -99,8 +106,9 @@ class BlockchainService:
                 'nonce': self.w3.eth.get_transaction_count(voter_address)
             })
             
-            # Sign and send transaction
-            signed_tx = self.w3.eth.account.sign_transaction(tx, private_key=settings.VOTER_PRIVATE_KEY)
+            # Sign and send transaction with the voter's private key
+            private_key = get_private_key_for_user(voter_address)
+            signed_tx = self.w3.eth.account.sign_transaction(tx, private_key=private_key)
             tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction)
             
             # Wait for transaction receipt

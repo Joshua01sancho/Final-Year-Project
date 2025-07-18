@@ -18,6 +18,9 @@ urlpatterns = [
     # API Routes
     path('api/', include('apps.api.urls')),
     
+    # Elections Routes (for the updated list_elections view)
+    path('api/', include('apps.elections.urls')),
+    
     # Health Check
     path('health/', include('apps.api.health_urls')),
     

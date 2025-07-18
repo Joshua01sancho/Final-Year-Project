@@ -1,39 +1,70 @@
-from web3 import Web3
-import json
+#!/usr/bin/env python
+"""
+Script to check elections in the database
+"""
 import os
-import django
 import sys
+import django
+from datetime import datetime, timezone
 
-# Setup Django environment
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
+# Add the backend directory to the Python path
+sys.path.append('backend')
+
+# Set up Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from apps.elections.models import Election
+from django.utils import timezone
 
-# --- CONFIGURE THESE ---
-provider_url = "http://127.0.0.1:7545"
-contract_address = "0x4A8A2B46125715171936334Df41EDf073b529f84"  # Your contract address
+def check_elections():
+    print("=== Checking Elections in Database ===")
+    
+    elections = Election.objects.all()
+    print(f"Total elections in database: {elections.count()}")
+    
+    if elections.count() == 0:
+        print("No elections found in database!")
+        return
+    
+    now = timezone.now()
+    print(f"Current time: {now}")
+    print()
+    
+    for election in elections:
+        print(f"Election: {election.title}")
+        print(f"  ID: {election.id}")
+        print(f"  Database Status: {election.status}")
+        print(f"  Is Public: {election.is_public}")
+        print(f"  Start Date: {election.start_date}")
+        print(f"  End Date: {election.end_date}")
+        print(f"  Created At: {election.created_at}")
+        print(f"  Created By: {election.created_by.username if election.created_by else 'None'}")
+        
+        # Calculate actual status
+        if election.status == 'draft':
+            actual_status = 'upcoming'
+        elif election.status == 'active':
+            if election.start_date <= now <= election.end_date:
+                actual_status = 'active'
+            elif now < election.start_date:
+                actual_status = 'upcoming'
+            else:
+                actual_status = 'ended'
+        elif election.status == 'paused':
+            actual_status = 'upcoming'
+        elif election.status == 'ended':
+            actual_status = 'ended'
+        elif election.status == 'cancelled':
+            actual_status = 'ended'
+        else:
+            actual_status = 'upcoming'
+        
+        print(f"  Calculated Status: {actual_status}")
+        print(f"  Is Active (model property): {election.is_active}")
+        print(f"  Has Ended (model property): {election.has_ended}")
+        print(f"  Total Candidates: {election.candidates.count()}")
+        print()
 
-election_title = "Unzasu"  # Set the election title you want to check
-
-election_obj = Election.objects.filter(title=election_title).first()
-if not election_obj:
-    print(f"Election with title '{election_title}' not found in the database.")
-    sys.exit(1)
-
-election_id = str(election_obj.id)  # or election_obj.election_id if you use a custom field
-print(f"Using election ID: {election_id} for title '{election_title}'")
-
-# Load ABI
-with open("truffle/build/contracts/VotingContract.json") as f:
-    contract_abi = json.load(f)["abi"]
-
-w3 = Web3(Web3.HTTPProvider(provider_url))
-contract = w3.eth.contract(address=w3.to_checksum_address(contract_address), abi=contract_abi)
-
-try:
-    election = contract.functions.getElection(election_id).call()
-    print(f"Election details for '{election_id}':", election)
-except Exception as e:
-    print(f"Error fetching election '{election_id}':", e) 
+if __name__ == "__main__":
+    check_elections() 

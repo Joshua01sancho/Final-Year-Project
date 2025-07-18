@@ -10,6 +10,7 @@ export default function VotePage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [voteSuccess, setVoteSuccess] = useState(false);
 
   // Fetch election details
   useEffect(() => {
@@ -36,9 +37,10 @@ export default function VotePage() {
     try {
       // Use the blockchain voting API
       const result = await apiClient.castVote(id, selectedCandidate);
+      setVoteSuccess(true);
       setMessage(`✅ Vote submitted successfully! Transaction: ${result.transaction_hash}`);
       
-      // Redirect to confirmation page after a delay
+      // Redirect to dashboard after a delay
       setTimeout(() => {
         router.push('/user/dashboard');
       }, 3000);
@@ -66,6 +68,25 @@ export default function VotePage() {
       <div>{message || 'Election not found.'}</div>
     </div>
   );
+
+  // Show success message if vote was successful
+  if (voteSuccess) {
+    return (
+      <div style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
+        <div style={{ 
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: 'white',
+          padding: '2rem',
+          borderRadius: '10px',
+          textAlign: 'center'
+        }}>
+          <h1 style={{ margin: 0, fontSize: '2rem', marginBottom: '1rem' }}>🎉 Vote Cast Successfully!</h1>
+          <p style={{ margin: '1rem 0', opacity: 0.9 }}>{message}</p>
+          <p style={{ margin: '1rem 0', opacity: 0.8 }}>Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>

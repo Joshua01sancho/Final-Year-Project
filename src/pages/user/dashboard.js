@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { Vote, Clock, CheckCircle, AlertCircle, User, Settings, Bell, Calendar } from 'lucide-react';
+import { Vote, Clock, CheckCircle, AlertCircle, User, Settings, Bell, Calendar, RefreshCw } from 'lucide-react';
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../components/common/Footer';
 import { useAuth } from '../../contexts/AuthProvider';
@@ -16,22 +16,57 @@ const UserDashboard = () => {
   const [elections, setElections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchElections = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiClient.getElections();
+      console.log('API Response:', res);
+      // Handle both response formats: {elections: [...]} and {results: [...]}
+      const electionsData = res.elections || res.results || [];
+      console.log('Elections data:', electionsData);
+      setElections(electionsData);
+    } catch (err) {
+      console.error('Error fetching elections:', err);
+      setError('Failed to load elections.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshElections = async () => {
+    setRefreshing(true);
+    try {
+      const res = await apiClient.getElections();
+      // Handle both response formats: {elections: [...]} and {results: [...]}
+      const electionsData = res.elections || res.results || [];
+      setElections(electionsData);
+    } catch (err) {
+      setError('Failed to refresh elections.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchElections() {
-      setLoading(true);
-      setError('');
-      try {
-        const res = await apiClient.getElections();
-        setElections(res.results || []);
-      } catch (err) {
-        setError('Failed to load elections.');
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchElections();
   }, []);
+
+  // Refresh data when returning to dashboard (e.g., after voting)
+  useEffect(() => {
+    const handleRouteChange = () => {
+      if (router.asPath === '/user/dashboard') {
+        fetchElections();
+      }
+    };
+
+    router.events.on('routeChangeComplete', handleRouteChange);
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChange);
+    };
+  }, [router]);
 
   const handleVote = (electionId) => {
     router.push(`/user/vote/${electionId}`);
@@ -71,6 +106,7 @@ const UserDashboard = () => {
     if (activeTab === 'active') return election.status === 'active';
     if (activeTab === 'upcoming') return election.status === 'upcoming';
     if (activeTab === 'ended') return election.status === 'ended';
+    if (activeTab === 'votes') return election.has_voted;
     return true;
   });
 
@@ -140,6 +176,14 @@ const UserDashboard = () => {
                   </p>
                 </div>
                 <div className="flex items-center space-x-4">
+                  <button 
+                    onClick={refreshElections}
+                    disabled={refreshing}
+                    className="btn-secondary flex items-center"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                  </button>
                   <Link href="/user/profile" className="btn-secondary">
                     <User className="h-4 w-4 mr-2" />
                     Profile
@@ -154,7 +198,12 @@ const UserDashboard = () => {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="card">
+              <button
+                className={`card text-left transition-shadow ${activeTab === 'active' ? 'ring-2 ring-primary-500 shadow-lg' : ''}`}
+                onClick={() => setActiveTab('active')}
+                style={{ cursor: 'pointer' }}
+                aria-label="Show Active Elections"
+              >
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
                     <Vote className="h-6 w-6 text-primary-600" />
@@ -166,9 +215,14 @@ const UserDashboard = () => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
 
-              <div className="card">
+              <button
+                className={`card text-left transition-shadow ${activeTab === 'votes' ? 'ring-2 ring-primary-500 shadow-lg' : ''}`}
+                onClick={() => setActiveTab('votes')}
+                style={{ cursor: 'pointer' }}
+                aria-label="Show Votes Cast"
+              >
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-success-100 rounded-lg flex items-center justify-center">
                     <CheckCircle className="h-6 w-6 text-success-600" />
@@ -180,9 +234,14 @@ const UserDashboard = () => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
 
-              <div className="card">
+              <button
+                className={`card text-left transition-shadow ${activeTab === 'upcoming' ? 'ring-2 ring-primary-500 shadow-lg' : ''}`}
+                onClick={() => setActiveTab('upcoming')}
+                style={{ cursor: 'pointer' }}
+                aria-label="Show Upcoming Elections"
+              >
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-warning-100 rounded-lg flex items-center justify-center">
                     <Clock className="h-6 w-6 text-warning-600" />
@@ -194,20 +253,34 @@ const UserDashboard = () => {
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
 
-              <div className="card">
+              <button
+                className={`card text-left transition-shadow ${activeTab === 'ended' ? 'ring-2 ring-primary-500 shadow-lg' : ''}`}
+                onClick={() => setActiveTab('ended')}
+                style={{ cursor: 'pointer' }}
+                aria-label="Show Completed Elections"
+              >
                 <div className="flex items-center">
-                  <div className="w-12 h-12 bg-info-100 rounded-lg flex items-center justify-center">
-                    <Bell className="h-6 w-6 text-info-600" />
+                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-gray-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Notifications</p>
-                    <p className="text-2xl font-bold text-gray-900">3</p>
+                    <p className="text-sm font-medium text-gray-600">Completed</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {elections.filter(e => e.status === 'ended').length}
+                    </p>
                   </div>
                 </div>
-              </div>
+              </button>
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800">{error}</p>
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="mb-6">
@@ -235,63 +308,34 @@ const UserDashboard = () => {
 
             {/* Elections Grid */}
             {filteredElections.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredElections.map((election) => (
-                  <BallotCard key={election.id} election={election} />
+                  <BallotCard
+                    key={election.id}
+                    election={election}
+                    onVote={handleVote}
+                    onVerifyVote={handleVerifyVote}
+                  />
                 ))}
               </div>
             ) : (
               <div className="text-center py-12">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                  <Vote className="h-12 w-12 text-gray-400" />
+                </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   No {activeTab} elections
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-500">
                   {activeTab === 'active' && 'There are currently no active elections.'}
                   {activeTab === 'upcoming' && 'No upcoming elections scheduled.'}
-                  {activeTab === 'ended' && 'You haven\'t participated in any elections yet.'}
+                  {activeTab === 'ended' && 'No completed elections yet.'}
                 </p>
               </div>
             )}
-
-            {/* Quick Actions */}
-            <div className="mt-12">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link href="/user/profile" className="card hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <User className="h-8 w-8 text-primary-600 mr-3" />
-                    <div>
-                      <h3 className="font-medium text-gray-900">Update Profile</h3>
-                      <p className="text-sm text-gray-600">Manage your personal information</p>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link href="/user/voting-history" className="card hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-8 w-8 text-success-600 mr-3" />
-                    <div>
-                      <h3 className="font-medium text-gray-900">Voting History</h3>
-                      <p className="text-sm text-gray-600">View your past votes</p>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link href="/help" className="card hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <Bell className="h-8 w-8 text-warning-600 mr-3" />
-                    <div>
-                      <h3 className="font-medium text-gray-900">Get Help</h3>
-                      <p className="text-sm text-gray-600">Support and documentation</p>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            </div>
           </div>
         </main>
-
+        
         <Footer />
       </div>
     </>

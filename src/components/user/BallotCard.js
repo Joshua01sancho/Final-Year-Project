@@ -107,7 +107,7 @@ const BallotCard = ({ election }) => {
         <div className="flex items-center text-sm text-gray-600">
           <Calendar className="h-4 w-4 mr-2" />
           <span>
-            {formatDate(election.startDate)} - {formatDate(election.endDate)}
+            {formatDate(election.start_date)} - {formatDate(election.end_date)}
           </span>
         </div>
         

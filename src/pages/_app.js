@@ -4,7 +4,6 @@ import { AuthProvider } from '../contexts/AuthProvider';
 import { ElectionProvider } from '../contexts/ElectionProvider';
 import { AccessibilityProvider } from '../contexts/AccessibilityProvider';
 import { LanguageProvider } from '../contexts/LanguageProvider';
-import RoleSwitcher from '../components/common/RoleSwitcher';
 import '../styles/globals.css';
 
 // Create a client
@@ -25,7 +24,6 @@ export default function App({ Component, pageProps }) {
           <AuthProvider>
             <ElectionProvider>
               <Component {...pageProps} />
-              <RoleSwitcher />
               <Toaster
                 position="top-right"
                 toastOptions={{

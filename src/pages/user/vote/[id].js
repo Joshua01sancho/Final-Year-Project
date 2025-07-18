@@ -15,20 +15,15 @@ export default function VotePage() {
   useEffect(() => {
     if (id) {
       setLoading(true);
-      // For now, we'll use a mock election since we need to create one in Django
-      // In production, this would come from your Django backend
-      const mockElection = {
-        id: id,
-        title: "Test Election 2024",
-        description: "A test election to demonstrate blockchain voting",
-        candidates: [
-          { id: 1, name: "Candidate A", party: "Party A", description: "Progressive candidate" },
-          { id: 2, name: "Candidate B", party: "Party B", description: "Conservative candidate" },
-          { id: 3, name: "Candidate C", party: "Independent", description: "Independent candidate" }
-        ]
-      };
-      setElection(mockElection);
-      setLoading(false);
+      apiClient.getElection(id)
+        .then((data) => {
+          setElection(data);
+        })
+        .catch((err) => {
+          setMessage('Failed to load election details.');
+          setElection(null);
+        })
+        .finally(() => setLoading(false));
     }
   }, [id]);
 

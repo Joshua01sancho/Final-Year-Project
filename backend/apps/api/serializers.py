@@ -8,7 +8,7 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['url', 'username', 'email', 'groups', 'blockchain_address']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'groups', 'blockchain_address']
 
 class VoterProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

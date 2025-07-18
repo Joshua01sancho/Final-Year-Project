@@ -105,7 +105,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Lusaka'
 USE_I18N = True
 USE_TZ = True
 
@@ -139,8 +139,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle'
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
+        'anon': '10000/hour',
+        'user': '100000/hour',
     }
 }
 
@@ -267,7 +267,5 @@ BLOCKCHAIN = {
 }
 
 # These should be set in environment variables in production
-ADMIN_PRIVATE_KEY = os.getenv('ADMIN_PRIVATE_KEY', 'REPLACE_WITH_YOUR_GANACHE_ADMIN_PRIVATE_KEY')
-VOTER_PRIVATE_KEY = os.getenv('VOTER_PRIVATE_KEY', 'REPLACE_WITH_YOUR_GANACHE_VOTER_PRIVATE_KEY') 
-ADMIN_PRIVATE_KEY = os.getenv('ADMIN_PRIVATE_KEY', 'REPLACE_WITH_YOUR_GANACHE_ADMIN_PRIVATE_KEY')
-VOTER_PRIVATE_KEY = os.getenv('VOTER_PRIVATE_KEY', 'REPLACE_WITH_YOUR_GANACHE_VOTER_PRIVATE_KEY') 
+ADMIN_PRIVATE_KEY = os.getenv('ADMIN_PRIVATE_KEY', '0x0ed17026394b4281656acc55a667c779fe602966a48596a8148076ad043c81f5')
+VOTER_PRIVATE_KEY = os.getenv('VOTER_PRIVATE_KEY', '0x0ed17026394b4281656acc55a667c779fe602966a48596a8148076ad043c81f5') 

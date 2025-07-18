@@ -21,9 +21,6 @@ urlpatterns = [
     # Health Check
     path('health/', include('apps.api.health_urls')),
     
-    # Election URLs
-    path('api/elections/', include('apps.elections.urls')),
-    
     # Voter Authentication URLs
     path('api/', include('apps.voters.urls')),
 ]

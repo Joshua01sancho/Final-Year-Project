@@ -1,11 +1,12 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from .blockchain import BlockchainService
 from apps.encryption.paillier import PaillierEncryption, VoteEncryption
 from web3 import Web3
+from .models import Election
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -124,5 +125,31 @@ def verify_vote(request, vote_hash):
     except Exception as e:
         return Response(
             {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_elections(request):
+    """List all public elections (for frontend display)"""
+    try:
+        elections = Election.objects.filter(is_public=True).order_by('-created_at')
+        data = [
+            {
+                'id': election.id,
+                'title': election.title,
+                'description': election.description,
+                'status': election.status,
+                'start_date': election.start_date,
+                'end_date': election.end_date,
+                'created_by': election.created_by.username if election.created_by else None,
+            }
+            for election in elections
+        ]
+        return Response({'elections': data})
+    except Exception as e:
+        print(f"Error in list_elections: {e}")
+        return Response(
+            {'error': 'Failed to fetch elections'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         ) 

@@ -3,14 +3,20 @@
 from rest_framework import viewsets, generics, status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth import get_user_model
 from apps.elections.models import Election, Candidate, Vote, ElectionResult
 from apps.voters.models import VoterProfile, BiometricData
+from apps.elections.blockchain import BlockchainService
+from apps.encryption.paillier import PaillierEncryption, VoteEncryption
+from web3 import Web3
 from .serializers import (
     ElectionSerializer, CandidateSerializer, VoteSerializer, UserSerializer,
     VoterProfileSerializer, BiometricDataSerializer, ElectionResultSerializer
 )
 from .permissions import IsAdminOrReadOnly, IsElectionManager, IsVoter
+from rest_framework.permissions import AllowAny
+from django.views.decorators.csrf import csrf_exempt
 
 User = get_user_model()
 
@@ -18,7 +24,12 @@ User = get_user_model()
 class ElectionViewSet(viewsets.ModelViewSet):
     queryset = Election.objects.all()
     serializer_class = ElectionSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Election.objects.all()
+        return Election.objects.filter(is_public=True)
 
 class CandidateViewSet(viewsets.ModelViewSet):
     queryset = Candidate.objects.all()
@@ -113,3 +124,157 @@ class AdminElectionListView(generics.ListAPIView):
 def health_check(request):
     from django.http import JsonResponse
     return JsonResponse({'status': 'ok'})
+
+# Voting endpoints (moved from elections app)
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def cast_vote(request):
+    """
+    Cast a vote in an election using the blockchain with Paillier encryption.
+    
+    Expected request data:
+    {
+        "election_id": "string",
+        "candidate_id": "string"
+    }
+    """
+    try:
+        # Validate request data
+        election_id = request.data.get('election_id')
+        candidate_id = request.data.get('candidate_id')
+        
+        if not election_id or not candidate_id:
+            return Response(
+                {'error': 'Missing required fields'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Initialize blockchain service
+        blockchain = BlockchainService()
+        
+        # Get election details
+        election = blockchain.get_election_details(election_id)
+        if not election:
+            return Response(
+                {'error': 'Election not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if election is active
+        if not election['is_active']:
+            return Response(
+                {'error': 'Election is not active'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Initialize Paillier encryption for vote encryption
+        paillier = PaillierEncryption(key_size=512)
+        vote_encryption = VoteEncryption()
+        
+        # For now, we'll use a simple key pair. In production, this should be
+        # generated during election setup and distributed securely
+        key_pair = paillier.generate_key_pair()
+        
+        # Convert candidate_id to integer for encryption
+        vote_value = int(candidate_id)
+        
+        # Encrypt the vote using Paillier
+        encrypted_vote = vote_encryption.encrypt_vote(vote_value, key_pair.public_key)
+        
+        # Convert encrypted vote to hex for blockchain storage
+        encrypted_vote_hex = hex(encrypted_vote)[2:]  # Remove '0x' prefix
+        
+        # Pad hex string to even length if necessary
+        if len(encrypted_vote_hex) % 2 != 0:
+            encrypted_vote_hex = '0' + encrypted_vote_hex
+        
+        encrypted_vote_bytes = bytes.fromhex(encrypted_vote_hex)
+        
+        # Ensure blockchain address is in checksum format
+        voter_address = Web3.to_checksum_address(request.user.blockchain_address)
+        
+        # Create vote hash for blockchain
+        w3 = Web3()
+        vote_hash_full = w3.solidity_keccak(
+            ['string', 'bytes', 'address'],
+            [election_id, encrypted_vote_bytes, voter_address]
+        )
+        
+        # Ensure vote_hash is exactly 32 bytes (bytes32)
+        vote_hash_bytes = vote_hash_full[:32]
+        
+        # Debug prints
+        print(f"DEBUG: election_id = {election_id} (type: {type(election_id)})")
+        print(f"DEBUG: voter_address = {voter_address} (type: {type(voter_address)})")
+        print(f"DEBUG: encrypted_vote_hex = {encrypted_vote_hex} (length: {len(encrypted_vote_hex)})")
+        print(f"DEBUG: encrypted_vote_bytes = {encrypted_vote_bytes} (type: {type(encrypted_vote_bytes)})")
+        print(f"DEBUG: vote_hash_full = {vote_hash_full} (length: {len(vote_hash_full)})")
+        print(f"DEBUG: vote_hash_bytes = {vote_hash_bytes} (length: {len(vote_hash_bytes)})")
+        
+        # Cast vote on blockchain
+        # Convert bytes to hex string with 0x prefix for blockchain
+        encrypted_vote_hexstr = '0x' + encrypted_vote_bytes.hex()
+        vote_hash_hexstr = '0x' + vote_hash_bytes.hex()
+        
+        success, tx_hash = blockchain.cast_vote(
+            election_id=election_id,
+            voter_address=voter_address,
+            encrypted_vote=encrypted_vote_hexstr,  # Pass as hex string
+            vote_hash=vote_hash_hexstr             # Pass as hex string
+        )
+        
+        if not success:
+            return Response(
+                {'error': f'Failed to cast vote: {tx_hash}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        return Response({
+            'message': 'Vote cast successfully with Paillier encryption',
+            'transaction_hash': tx_hash,
+            'vote_hash': vote_hash_bytes.hex(),
+            'encryption_info': {
+                'method': 'Paillier',
+                'public_key_n': str(key_pair.public_key[0]),
+                'public_key_g': str(key_pair.public_key[1])
+            }
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def verify_vote(request, vote_hash):
+    """
+    Verify a vote on the blockchain using its hash.
+    """
+    try:
+        blockchain = BlockchainService()
+        vote_info = blockchain.verify_vote(vote_hash)
+        
+        if not vote_info:
+            return Response(
+                {'error': 'Vote not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return Response(vote_info)
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@csrf_exempt
+@api_view(['GET'])
+def user_me(request):
+    print("user_me called. request.user:", request.user, "is_authenticated:", request.user.is_authenticated)
+    if not request.user.is_authenticated:
+        return Response({'error': 'Not authenticated'}, status=401)
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)

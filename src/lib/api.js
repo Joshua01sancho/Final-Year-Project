@@ -23,6 +23,9 @@ class ApiClient {
         const token = this.getAuthToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          console.log('[api.js] Using Authorization header:', config.headers.Authorization);
+        } else {
+          console.log('[api.js] No auth token found for request');
         }
         return config;
       },
@@ -81,7 +84,9 @@ class ApiClient {
   }
 
   async signupWithCredentials(userData) {
-    const response = await this.client.post('/auth/signup/', userData);
+    // Remove blockchainAddress if present
+    const { blockchainAddress, ...rest } = userData;
+    const response = await this.client.post('/auth/signup/', rest);
     return response.data;
   }
 
@@ -128,7 +133,8 @@ class ApiClient {
 
   // Blockchain Voting endpoints (Django backend)
   async castVote(electionId, candidateId) {
-    const response = await this.client.post('/elections/vote/', {
+    console.log('[api.js] castVote called with:', { electionId, candidateId });
+    const response = await this.client.post('/vote/', {
       election_id: electionId,
       candidate_id: candidateId
     });

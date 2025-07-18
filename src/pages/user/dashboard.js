@@ -11,28 +11,26 @@ import { apiClient } from '../../lib/api';
 
 const UserDashboard = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, jwtDebug, authError } = useAuth();
   const [activeTab, setActiveTab] = useState('active');
   const [elections, setElections] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Mock data for now - in production this would come from your Django backend
-    const mockElections = [
-      {
-        id: 'TEST_ELECTION_1',
-        title: 'Test Election 2024',
-        description: 'A test election to demonstrate blockchain voting functionality',
-        status: 'active',
-        start_date: '2024-01-01',
-        end_date: '2024-12-31',
-        total_candidates: 3,
-        has_voted: false
+    async function fetchElections() {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await apiClient.getElections();
+        setElections(res.results || []);
+      } catch (err) {
+        setError('Failed to load elections.');
+      } finally {
+        setLoading(false);
       }
-    ];
-    
-    setElections(mockElections);
-    setLoading(false);
+    }
+    fetchElections();
   }, []);
 
   const handleVote = (electionId) => {
@@ -82,6 +80,26 @@ const UserDashboard = () => {
     { id: 'ended', label: 'Completed', count: elections.filter(e => e.status === 'ended').length },
   ];
 
+  // Helper to format date
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Invalid Date';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return 'Invalid Date';
+    return d.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  // Fix welcome message to use correct user field
+  const displayName = user?.username || 'Voter';
+
+  // DEBUG: Print raw election data
+  console.log('Elections data:', elections);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -95,6 +113,11 @@ const UserDashboard = () => {
 
   return (
     <>
+      {authError && (
+        <div style={{ background: '#fee', color: '#900', padding: '1em', marginBottom: '1em', textAlign: 'center', fontWeight: 'bold' }}>
+          {authError}
+        </div>
+      )}
       <Head>
         <title>User Dashboard - E-Vote System</title>
         <meta name="description" content="Your personal voting dashboard" />
@@ -110,7 +133,7 @@ const UserDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Welcome back, {user?.firstName}!
+                    Welcome back, {displayName}!
                   </h1>
                   <p className="text-gray-600">
                     Here are your available elections and voting history

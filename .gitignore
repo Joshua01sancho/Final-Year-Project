@@ -1,53 +1,105 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+debug.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+coverage/
+
+# Translations
+*.mo
+*.pot
+
+# Django
 *.log
+local_settings.py
+db.sqlite3
+media/
+staticfiles/
+logs/
 
-# Node / Next.js
-node_modules/
-.next/
+# VS Code
+.vscode/
 
-# PostgreSQL dumps
-*.sql
-*.dump
-*.backup
+# PyCharm
+.idea/
 
-# Environment config files
+# mypy
+.mypy_cache/
+.dmypy.json
+
+# Environments
+venv/
+ENV/
 .env
+.env.*
 *.env
 
-# macOS and Windows system files
-.DS_Store
-Thumbs.db
+# Node.js & Next.js
+node_modules/
+.next/
+.next/cache/
+out/
+*.local
+package-lock.json
+yarn.lock
 
-# Python virtual environments
-venv/
-backend/venv/
-E-Voting System/venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# Django logs and static files
-*.sqlite3
-*.log
-backend/logs/
-backend/static/
-backend/media/
-
-# IDE/editor configs
-.vscode/
-.idea/
-*.swp
-
-# Compiled contracts and blockchain artifacts
+# Truffle/Blockchain
 truffle/build/
 truffle/contracts/*.abi
 truffle/contracts/*.bin
+*.sol.js
+*.sol.json
 
 # Misc
+*.swp
+*~
 *.bak
-*.tmp
+
+# Test artifacts
+test_*.pyc
+test_*.log
+
+# Pipenv
+Pipfile.lock

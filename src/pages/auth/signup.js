@@ -6,6 +6,7 @@ import FaceRegistration from '../../components/auth/FaceRegistration';
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../components/common/Footer';
 import apiClient from '../../lib/api';
+import PageLayout from '../../components/layout/PageLayout';
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({
@@ -54,7 +55,7 @@ const SignupPage = () => {
   };
 
   return (
-    <>
+    <PageLayout>
       <Head>
         <title>Sign Up | E-Vote</title>
       </Head>
@@ -98,7 +99,7 @@ const SignupPage = () => {
         </div>
       </div>
       <Footer />
-    </>
+    </PageLayout>
   );
 };
 

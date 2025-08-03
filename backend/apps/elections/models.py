@@ -8,12 +8,19 @@ This module defines the database models for:
 - Election results
 """
 
+import os
+import uuid
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.conf import settings
 import json
+from django.core.exceptions import ValidationError
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from PIL import Image
+import io
 
 class Election(models.Model):
     """Model for storing election information"""
@@ -131,6 +138,7 @@ class Candidate(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     image_url = models.URLField(blank=True, null=True)
+    image = models.ImageField(upload_to='candidates/', blank=True, null=True, help_text="Upload candidate profile picture")
     order = models.PositiveIntegerField(default=0)
     
     # Metadata
@@ -148,6 +156,58 @@ class Candidate(models.Model):
     def __str__(self):
         return f"{self.name} ({self.election.title})"
     
+    def clean(self):
+        """Validate the model"""
+        super().clean()
+        if self.image and self.image_url:
+            raise ValidationError("Cannot have both image file and image URL. Please choose one.")
+    
+    def save(self, *args, **kwargs):
+        """Override save to process image if uploaded"""
+        if self.image:
+            self.process_image()
+        super().save(*args, **kwargs)
+    
+    def process_image(self):
+        """Process uploaded image - resize and optimize"""
+        if not self.image:
+            return
+            
+        try:
+            # Open the image
+            img = Image.open(self.image)
+            
+            # Convert to RGB if necessary
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Resize to standard dimensions (400x400)
+            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+            
+            # Save the processed image
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=85, optimize=True)
+            buffer.seek(0)
+            
+            # Generate unique filename
+            filename = f"candidate_{self.election.id}_{self.id}_{uuid.uuid4().hex[:8]}.jpg"
+            
+            # Save to storage
+            self.image.save(filename, ContentFile(buffer.getvalue()), save=False)
+            
+        except Exception as e:
+            # If image processing fails, keep the original
+            print(f"Image processing error for candidate {self.name}: {e}")
+    
+    @property
+    def display_image(self):
+        """Get the display image URL - prioritize uploaded image over URL"""
+        if self.image:
+            return self.image.url
+        elif self.image_url:
+            return self.image_url
+        return None
+    
     @property
     def vote_count(self):
         """Get vote count for this candidate"""
@@ -155,6 +215,14 @@ class Candidate(models.Model):
             is_valid=True,
             encrypted_vote_data__contains=f'"candidate_id": {self.id}'
         ).count()
+    
+    def delete_image(self):
+        """Delete the uploaded image file"""
+        if self.image:
+            if default_storage.exists(self.image.name):
+                default_storage.delete(self.image.name)
+            self.image = None
+            self.save(update_fields=['image'])
 
 class Vote(models.Model):
     """Model for storing encrypted votes"""

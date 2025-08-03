@@ -1,176 +1,234 @@
 import React from 'react';
 import Link from 'next/link';
-import { Vote, Clock, CheckCircle, AlertCircle, Users, Calendar, Circle, User } from 'lucide-react';
+import { Vote, Clock, CheckCircle, AlertCircle, User, Award, TrendingUp } from 'lucide-react';
+import Card from '../common/Card';
+import Button from '../common/Button';
+import CountdownTimer from '../common/CountdownTimer';
+import ProgressBar from '../common/ProgressBar';
 
 const BallotCard = ({ election, onVote, onVerifyVote }) => {
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active':
-        return 'text-success-600 bg-success-50 border-success-200';
-      case 'upcoming':
-        return 'text-warning-600 bg-warning-50 border-warning-200';
-      case 'ended':
-        return 'text-gray-600 bg-gray-50 border-gray-200';
-      default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+  const getStatusConfig = (status) => {
+    const configs = {
+      active: {
+        color: 'success',
+        icon: TrendingUp,
+        text: 'Active Now',
+        badgeClass: 'badge-success animate-pulse'
+      },
+      upcoming: {
+        color: 'warning',
+        icon: Clock,
+        text: 'Upcoming',
+        badgeClass: 'badge-warning animate-bounce-slow'
+      },
+      ended: {
+        color: 'error',
+        icon: AlertCircle,
+        text: 'Ended',
+        badgeClass: 'badge-error'
+      },
+      paused: {
+        color: 'warning',
+        icon: Clock,
+        text: 'Paused',
+        badgeClass: 'badge-warning'
+      }
+    };
+    return configs[status] || configs.upcoming;
+  };
+
+  const statusConfig = getStatusConfig(election.status);
+  const Icon = statusConfig.icon;
+  const participation = election.total_voters > 0 
+    ? (election.total_votes / election.total_voters) * 100 
+    : 0;
+
+  const getCandidateImage = (candidate) => {
+    // Prioritize uploaded image over URL
+    if (candidate.display_image) {
+      return candidate.display_image;
+    } else if (candidate.image_url) {
+      return candidate.image_url;
     }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'active':
-        return <Vote className="h-4 w-4" />;
-      case 'upcoming':
-        return <Clock className="h-4 w-4" />;
-      case 'ended':
-        return <CheckCircle className="h-4 w-4" />;
-      default:
-        return <AlertCircle className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'active':
-        return 'Active';
-      case 'upcoming':
-        return 'Upcoming';
-      case 'ended':
-        return 'Ended';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getVoteButton = () => {
-    // Check if user has voted (this will be handled by the backend)
-    const hasVoted = election.has_voted || false;
-    
-    if (election.status === 'active' && !hasVoted) {
-      return (
-        <Link href={`/user/vote/${election.id}`} className="btn-primary w-full">
-          <Vote className="h-4 w-4 mr-2" />
-          Vote Now
-        </Link>
-      );
-    } else if (election.status === 'active' && hasVoted) {
-      return (
-        <div className="flex items-center justify-center text-success-600 bg-success-50 px-4 py-2 rounded-lg">
-          <CheckCircle className="h-4 w-4 mr-2" />
-          Voted
-        </div>
-      );
-    } else if (election.status === 'upcoming') {
-      return (
-        <button className="btn-secondary w-full" disabled>
-          <Clock className="h-4 w-4 mr-2" />
-          Coming Soon
-        </button>
-      );
-    } else if (election.status === 'ended') {
-      return (
-        <Link href={`/user/results/${election.id}`} className="btn-secondary w-full">
-          <CheckCircle className="h-4 w-4 mr-2" />
-          View Results
-        </Link>
-      );
-    }
-  };
-
-  // Helper to get candidate name by ID
-  const getCandidateName = (candidateId) => {
-    if (!election.candidates) return candidateId;
-    const candidate = election.candidates.find(c => c.id === candidateId);
-    if (!candidate) return candidateId;
-    return `${candidate.name}${candidate.party ? ' (' + candidate.party + ')' : ''}`;
+    // Return a placeholder image or null
+    return null;
   };
 
   return (
-    <div className="card hover:shadow-lg transition-shadow">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">
-            {election.title}
-          </h3>
-          <p className="text-sm text-gray-600 line-clamp-2">
-            {election.description}
-          </p>
-        </div>
-        <div className={`ml-4 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(election.status)}`}>
-          <div className="flex items-center">
-            {getStatusIcon(election.status)}
-            <span className="ml-1">{getStatusText(election.status)}</span>
+    <Card variant="interactive" className="hover:shadow-lg transition-all duration-300">
+      <Card.Header>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <Card.Title className="text-xl font-bold text-gray-900 mb-2">
+              {election.title}
+            </Card.Title>
+            <Card.Subtitle className="text-gray-600 mb-3">
+              {election.description}
+            </Card.Subtitle>
+            
+            <div className="flex items-center space-x-2 mb-3">
+              <span className={`badge ${statusConfig.badgeClass}`}>
+                <Icon className="h-3 w-3 mr-1" />
+                {statusConfig.text}
+              </span>
+              {election.has_voted && (
+                <span className="badge badge-success">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Voted
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </Card.Header>
 
-      {/* Election Details */}
-      <div className="space-y-3 mb-6">
-        <div className="flex items-center text-sm text-gray-600">
-          <Calendar className="h-4 w-4 mr-2" />
-          <span>
-            {formatDate(election.start_date)} - {formatDate(election.end_date)}
-          </span>
-        </div>
-        
-        <div className="flex items-center text-sm text-gray-600">
-          <Users className="h-4 w-4 mr-2" />
-          <span>{election.candidates?.length || 0} candidates</span>
-        </div>
-
-        <div className="flex items-center text-sm text-gray-600">
-          <Vote className="h-4 w-4 mr-2" />
-          <span className="capitalize">{election.election_type || 'single'} choice</span>
-        </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="bg-gray-50 rounded-lg p-3 mb-6">
-        <p className="text-sm text-gray-700">
-          <strong>Instructions:</strong> Select {election.max_choices || 1} candidate{(election.max_choices || 1) > 1 ? 's' : ''} for this {election.election_type || 'single'} choice election.
-        </p>
-      </div>
-
-      {/* Action Button */}
-      <div className="mt-auto">
-        {getVoteButton()}
-      </div>
-
-      {/* Additional Info: Show voted candidate(s) if present */}
-      {election.has_voted && election.voted_candidate && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">You voted for:</span>
-            <span className="text-primary-700 font-medium">
-              {Array.isArray(election.voted_candidate)
-                ? election.voted_candidate.map(getCandidateName).join(', ')
-                : getCandidateName(election.voted_candidate)}
-            </span>
+      <Card.Body>
+        <div className="space-y-4">
+          {/* Election Details */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-gray-500">Start Date</p>
+              <p className="font-medium">{new Date(election.start_date).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">End Date</p>
+              <p className="font-medium">{new Date(election.end_date).toLocaleDateString()}</p>
+            </div>
           </div>
-          {election.vote_hash && (
-            <div className="flex items-center justify-between text-xs mt-2">
-              <span className="text-gray-400">Vote Hash:</span>
-              <span className="font-mono text-gray-500">{election.vote_hash}</span>
+
+          {/* Countdown Timer */}
+          {election.status === 'upcoming' && (
+            <div className="bg-warning-50 p-3 rounded-lg">
+              <p className="text-warning-700 text-sm font-medium mb-1">Starts in:</p>
+              <CountdownTimer targetTime={election.start_date} />
             </div>
           )}
-          {election.blockchain_tx_hash && (
-            <div className="flex items-center justify-between text-xs mt-1">
-              <span className="text-gray-400">Blockchain TX:</span>
-              <span className="font-mono text-gray-500">{election.blockchain_tx_hash}</span>
+
+          {election.status === 'active' && (
+            <div className="bg-success-50 p-3 rounded-lg">
+              <p className="text-success-700 text-sm font-medium mb-1">Ends in:</p>
+              <CountdownTimer targetTime={election.end_date} />
             </div>
           )}
+
+          {/* Participation Progress */}
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-gray-600">Participation</span>
+              <span className="font-medium">{Math.round(participation)}%</span>
+            </div>
+            <ProgressBar 
+              value={election.total_votes} 
+              max={election.total_voters} 
+              color="primary"
+              showValue={false}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {election.total_votes} of {election.total_voters} votes cast
+            </p>
+          </div>
+
+          {/* Candidates Preview */}
+          {election.candidates && election.candidates.length > 0 && (
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-2">Candidates ({election.candidates.length})</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {election.candidates.slice(0, 4).map((candidate) => (
+                  <div key={candidate.id} className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                      {getCandidateImage(candidate) ? (
+                        <img 
+                          src={getCandidateImage(candidate)} 
+                          alt={candidate.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div className="w-full h-full flex items-center justify-center bg-gray-300" style={{ display: getCandidateImage(candidate) ? 'none' : 'flex' }}>
+                        <User className="h-4 w-4 text-gray-500" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {candidate.name}
+                      </p>
+                      {candidate.party && (
+                        <p className="text-xs text-gray-500 truncate">
+                          {candidate.party}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {election.candidates.length > 4 && (
+                  <div className="flex items-center justify-center text-xs text-gray-500">
+                    +{election.candidates.length - 4} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Instructions */}
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <h5 className="font-medium text-gray-900 mb-1">Instructions</h5>
+            <ul className="text-xs text-gray-600 space-y-1">
+              <li>• You can only vote once per election</li>
+              <li>• Your vote is encrypted and secure</li>
+              <li>• Results will be available after the election ends</li>
+            </ul>
+          </div>
         </div>
-      )}
-    </div>
+      </Card.Body>
+
+      <Card.Footer>
+        <div className="flex items-center justify-between">
+          {election.has_voted ? (
+            <div className="flex items-center space-x-2 text-success-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">Vote Submitted</span>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              {election.status === 'active' ? 'Ready to vote' : 'Not yet available'}
+            </div>
+          )}
+          
+          <div className="flex space-x-2">
+            {election.has_voted && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onVerifyVote && onVerifyVote(election.id)}
+              >
+                Verify Vote
+              </Button>
+            )}
+            
+            {election.status === 'active' && !election.has_voted && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onVote && onVote(election.id)}
+              >
+                Vote Now
+              </Button>
+            )}
+            
+            <Button
+              variant="secondary"
+              size="sm"
+              href={election.status === 'ended' ? `/user/results/${election.id}` : `/user/vote/${election.id}`}
+            >
+              {election.status === 'ended' ? 'View Results' : 'View Details'}
+            </Button>
+          </div>
+        </div>
+      </Card.Footer>
+    </Card>
   );
 };
 

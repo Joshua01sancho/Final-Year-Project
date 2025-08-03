@@ -10,7 +10,7 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      withCredentials: true, // For HTTP-only cookies
+      withCredentials: false, // Changed from true to false to fix CORS issues
     });
 
     this.setupInterceptors();
@@ -166,7 +166,7 @@ class ApiClient {
 
   // Analytics endpoints
   async getElectionResults(electionId) {
-    const response = await this.client.get(`/admin/elections/${electionId}/results`);
+    const response = await this.client.get(`/elections/${electionId}/results/`);
     return response.data;
   }
 

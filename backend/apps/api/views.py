@@ -4,21 +4,115 @@ from rest_framework import viewsets, generics, status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth.models import User
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.db import transaction
 from apps.elections.models import Election, Candidate, Vote, ElectionResult
-from apps.voters.models import VoterProfile, BiometricData
+from apps.voters.models import Voter, BiometricData
 from apps.elections.blockchain import BlockchainService
 from apps.encryption.paillier import PaillierEncryption, VoteEncryption
 from web3 import Web3
 from .serializers import (
     ElectionSerializer, CandidateSerializer, VoteSerializer, UserSerializer,
-    VoterProfileSerializer, BiometricDataSerializer, ElectionResultSerializer
+    VoterSerializer, BiometricDataSerializer, ElectionResultSerializer
 )
 from .permissions import IsAdminOrReadOnly, IsElectionManager, IsVoter
 from rest_framework.permissions import AllowAny
 from django.views.decorators.csrf import csrf_exempt
 
 User = get_user_model()
+
+# Authentication Views
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        if not username or not password:
+            return Response(
+                {'error': 'Username and password are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user = authenticate(username=username, password=password)
+        
+        if user is None:
+            return Response(
+                {'error': 'Invalid credentials'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+            }
+        })
+
+class SignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        username = request.data.get('username')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        first_name = request.data.get('first_name', '')
+        last_name = request.data.get('last_name', '')
+        blockchain_address = request.data.get('blockchain_address', '')
+        
+        if not username or not email or not password:
+            return Response(
+                {'error': 'Username, email, and password are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Create user
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    first_name=first_name,
+                    last_name=last_name
+                )
+                
+                # Create voter profile
+                voter = Voter.objects.create(
+                    user=user,
+                    blockchain_address=blockchain_address
+                )
+                
+                # Generate tokens
+                refresh = RefreshToken.for_user(user)
+                
+                return Response({
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                    }
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to create user: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 # ViewSets for routers
 class ElectionViewSet(viewsets.ModelViewSet):
@@ -49,15 +143,15 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
 
-class VoterProfileViewSet(viewsets.ModelViewSet):
-    queryset = VoterProfile.objects.all()
-    serializer_class = VoterProfileSerializer
+class VoterViewSet(viewsets.ModelViewSet):
+    queryset = Voter.objects.all()
+    serializer_class = VoterSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         if self.request.user.is_staff:
-            return VoterProfile.objects.all()
-        return VoterProfile.objects.filter(user=self.request.user)
+            return Voter.objects.all()
+        return Voter.objects.filter(user=self.request.user)
 
 class BiometricDataViewSet(viewsets.ModelViewSet):
     queryset = BiometricData.objects.all()
@@ -85,22 +179,31 @@ class ElectionResultView(generics.RetrieveAPIView):
             candidates = election.get_candidates()
             # Get candidate results (dict of candidate_id: vote_count)
             candidate_results = result.candidate_results or {}
-            # Build results list
-            results = []
-            for candidate in candidates:
-                votes = candidate_results.get(str(candidate.id), 0)
-                results.append({
-                    'candidate': candidate.name,
-                    'votes': votes
-                })
-            # Find winner(s)
-            max_votes = max([r['votes'] for r in results], default=0)
-            winners = [r['candidate'] for r in results if r['votes'] == max_votes and max_votes > 0]
+            
+            # Return the data structure expected by the frontend
             return Response({
-                'election': election.title,
-                'results': results,
-                'total_votes': result.total_votes,
-                'winners': winners
+                'election': {
+                    'id': election.id,
+                    'title': election.title,
+                    'description': election.description,
+                    'start_date': election.start_date,
+                    'end_date': election.end_date,
+                    'status': election.status,
+                    'candidates': [
+                        {
+                            'id': candidate.id,
+                            'name': candidate.name,
+                            'party': candidate.party,
+                            'image_url': candidate.image_url,
+                            'display_image': candidate.display_image,
+                        } for candidate in candidates
+                    ]
+                },
+                'results': {
+                    'candidate_results': candidate_results,
+                    'total_votes': result.total_votes,
+                    'winners': []
+                }
             })
         except Election.DoesNotExist:
             return Response({'error': 'Election not found'}, status=404)
@@ -151,6 +254,20 @@ class AdminElectionListView(generics.ListAPIView):
 def health_check(request):
     from django.http import JsonResponse
     return JsonResponse({'status': 'ok'})
+
+# Test authentication endpoint
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def test_auth(request):
+    """
+    Test endpoint to check authentication status
+    """
+    return Response({
+        'authenticated': request.user.is_authenticated,
+        'user_id': request.user.id if request.user.is_authenticated else None,
+        'username': request.user.username if request.user.is_authenticated else None,
+        'auth_header': request.headers.get('Authorization', 'No Authorization header'),
+    })
 
 # Voting endpoints (moved from elections app)
 @api_view(['POST'])
@@ -328,8 +445,34 @@ def verify_vote(request, vote_hash):
 @csrf_exempt
 @api_view(['GET'])
 def user_me(request):
-    print("user_me called. request.user:", request.user, "is_authenticated:", request.user.is_authenticated)
-    if not request.user.is_authenticated:
-        return Response({'error': 'Not authenticated'}, status=401)
-    serializer = UserSerializer(request.user)
-    return Response(serializer.data)
+    """
+    Get current user information
+    """
+    try:
+        print("user_me called. request.user:", request.user, "is_authenticated:", request.user.is_authenticated)
+        
+        if not request.user.is_authenticated:
+            return Response({'error': 'Not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Return user data in the format expected by the frontend
+        user_data = {
+            'id': request.user.id,
+            'username': request.user.username,
+            'email': request.user.email,
+            'first_name': request.user.first_name,
+            'last_name': request.user.last_name,
+        }
+        
+        # Add blockchain address if available
+        if hasattr(request.user, 'blockchain_address') and request.user.blockchain_address:
+            user_data['blockchain_address'] = request.user.blockchain_address
+        
+        print("user_me returning:", user_data)
+        return Response(user_data)
+        
+    except Exception as e:
+        print(f"user_me error: {e}")
+        return Response(
+            {'error': 'Failed to get user data'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

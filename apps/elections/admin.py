@@ -1,10 +1,71 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.urls import path, reverse
+from django.shortcuts import redirect
+from django.contrib import messages
+from django.http import HttpResponseRedirect
 from .models import Election, Candidate, Vote, ElectionResult, ElectionAuditLog
 
 class CandidateInline(admin.TabularInline):
     model = Candidate
     extra = 1
-    fields = ('name', 'description', 'image_url', 'order', 'party', 'position')
+    fields = ('name', 'description', 'image', 'image_url', 'order', 'party', 'position')
+    
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        form = formset.form
+        
+        # Add help text for image field
+        if 'image' in form.base_fields:
+            form.base_fields['image'].help_text = "Upload a profile picture for this candidate. Recommended size: 400x400 pixels."
+        
+        return formset
+
+@admin.register(Candidate)
+class CandidateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'election', 'order', 'party', 'position', 'display_image_preview')
+    list_filter = ('election', 'party', 'position')
+    search_fields = ('name', 'election__title', 'party', 'position')
+    fieldsets = (
+        (None, {
+            'fields': ('election', 'name', 'description', 'order')
+        }),
+        ('Image', {
+            'fields': ('image', 'image_url'),
+            'description': 'Upload an image file or provide an image URL. Image upload is preferred.'
+        }),
+        ('Additional Information', {
+            'fields': ('party', 'position', 'metadata'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def display_image_preview(self, obj):
+        """Display image preview in admin list"""
+        if obj.display_image:
+            return format_html(
+                '<img src="{}" style="max-width: 50px; max-height: 50px; border-radius: 4px;" />',
+                obj.display_image
+            )
+        return "No image"
+    display_image_preview.short_description = 'Image'
+    
+    def save_model(self, request, obj, form, change):
+        """Handle image upload and processing"""
+        if form.cleaned_data.get('image') and form.cleaned_data.get('image_url'):
+            messages.warning(request, 'Both image file and URL provided. Image file will be used.')
+            obj.image_url = ''  # Clear URL when file is uploaded
+        
+        super().save_model(request, obj, form, change)
+        
+        # Process image if uploaded
+        if obj.image:
+            try:
+                obj.process_image()
+                obj.save(update_fields=['image'])
+                messages.success(request, f'Image processed successfully for {obj.name}')
+            except Exception as e:
+                messages.error(request, f'Error processing image for {obj.name}: {str(e)}')
 
 @admin.register(Election)
 class ElectionAdmin(admin.ModelAdmin):
@@ -27,12 +88,6 @@ class ElectionAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at')
         }),
     )
-
-@admin.register(Candidate)
-class CandidateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'election', 'order', 'party', 'position')
-    list_filter = ('election', 'party', 'position')
-    search_fields = ('name', 'election__title', 'party', 'position')
 
 @admin.register(Vote)
 class VoteAdmin(admin.ModelAdmin):

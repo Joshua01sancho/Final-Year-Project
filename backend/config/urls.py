@@ -15,11 +15,8 @@ urlpatterns = [
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
-    # API Routes
+    # API Routes - Main API endpoints
     path('api/', include('apps.api.urls')),
-    
-    # Elections Routes (for the updated list_elections view)
-    path('api/', include('apps.elections.urls')),
     
     # Health Check
     path('health/', include('apps.api.health_urls')),

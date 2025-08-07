@@ -29,7 +29,7 @@ ChartJS.register(
   Legend
 );
 
-const ElectionResults = () => {
+function ElectionResults() {
   const router = useRouter();
   const { id } = router.query;
   const { user } = useAuth();

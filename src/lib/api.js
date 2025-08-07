@@ -67,8 +67,23 @@ class ApiClient {
     return response.data;
   }
 
+  async loginWithFaceLocal(faceImage) {
+    const response = await this.client.post('/auth/face-login-local/', { 
+      faceImage: faceImage 
+    });
+    return response.data;
+  }
+
   async signupWithFace(userData, faceImage) {
     const response = await this.client.post('/auth/face-signup/', {
+      ...userData,
+      faceImage: faceImage
+    });
+    return response.data;
+  }
+
+  async signupWithFaceLocal(userData, faceImage) {
+    const response = await this.client.post('/auth/face-signup-local/', {
       ...userData,
       faceImage: faceImage
     });
@@ -84,8 +99,18 @@ class ApiClient {
   }
 
   async signupWithCredentials(userData) {
-    // Do not remove blockchainAddress; send it to the backend
-    const response = await this.client.post('/auth/signup/', userData);
+    // Remove confirmPassword from the data sent to backend
+    const { confirmPassword, ...signupData } = userData;
+    const response = await this.client.post('/auth/signup/', signupData);
+    return response.data;
+  }
+
+  async addFaceAuthToUser(faceImage, userId = null) {
+    const data = { face_image: faceImage };
+    if (userId) {
+      data.user_id = userId;
+    }
+    const response = await this.client.post('/auth/add-face-auth/', data);
     return response.data;
   }
 

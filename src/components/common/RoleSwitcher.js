@@ -2,55 +2,15 @@ import React from 'react';
 import { User, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthProvider';
 
-const RoleSwitcher = () => {
-  const { user, updateUser } = useAuth();
+function RoleSwitcher() {
+  const { user, switchRole } = useAuth();
 
   const switchToVoter = () => {
-    updateUser({
-      id: '1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '+1234567890',
-      role: 'voter',
-      isVerified: true,
-      dateOfBirth: '1990-01-01',
-      nationalId: '123456789',
-      address: '123 Main St',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10001',
-      biometricSetup: {
-        faceRegistered: true,
-        fingerprintRegistered: false,
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    switchRole('voter');
   };
 
   const switchToAdmin = () => {
-    updateUser({
-      id: '2',
-      firstName: 'Admin',
-      lastName: 'User',
-      email: 'admin@evote.com',
-      phone: '+1234567890',
-      role: 'admin',
-      isVerified: true,
-      dateOfBirth: '1985-01-01',
-      nationalId: '987654321',
-      address: '456 Admin Ave',
-      city: 'Washington',
-      state: 'DC',
-      zipCode: '20001',
-      biometricSetup: {
-        faceRegistered: true,
-        fingerprintRegistered: true,
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    switchRole('admin');
   };
 
   return (

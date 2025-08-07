@@ -1,3 +1,4 @@
+import React from 'react';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '../contexts/AuthProvider';
@@ -6,12 +7,14 @@ import { AccessibilityProvider } from '../contexts/AccessibilityProvider';
 import { LanguageProvider } from '../contexts/LanguageProvider';
 import '../styles/globals.css';
 
-// Create a client
+// Create a client with optimized settings for development
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
     },
   },
 });

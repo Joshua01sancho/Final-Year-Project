@@ -295,6 +295,20 @@ class Vote(models.Model):
             'reason': reason
         })
         self.save()
+    
+    def get_security_info(self):
+        """Get security information for admin display"""
+        return {
+            'vote_integrity': 'Verified' if self.vote_hash else 'Not verified',
+            'blockchain_confirmed': bool(self.blockchain_tx_hash),
+            'biometric_verified': all([self.face_verified, self.fingerprint_verified, self.two_fa_verified]),
+            'last_modified': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else 'Never',
+            'security_level': 'High' if self.vote_hash and self.blockchain_tx_hash else 'Medium'
+        }
+    
+    def is_immutable(self):
+        """Check if this record is immutable (for security)"""
+        return True  # All vote data is immutable for security
 
 class ElectionResult(models.Model):
     """Model for storing election results"""
@@ -355,6 +369,21 @@ class ElectionResult(models.Model):
             if votes == max_votes
         ]
         return winners
+    
+    def get_security_info(self):
+        """Get security information for admin display"""
+        return {
+            'decryption_status': self.decryption_status,
+            'trustees_participated': len(self.trustees_participated) if self.trustees_participated else 0,
+            'total_votes': self.total_votes,
+            'candidates_count': len(self.candidate_results) if self.candidate_results else 0,
+            'last_modified': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else 'Never',
+            'security_level': 'High' if self.decryption_status == 'completed' else 'Medium'
+        }
+    
+    def is_immutable(self):
+        """Check if this record is immutable (for security)"""
+        return True  # All election results are immutable for security
 
 class ElectionAuditLog(models.Model):
     """Model for storing election audit logs"""
@@ -380,4 +409,19 @@ class ElectionAuditLog(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.event_type} - {self.election.title} - {self.timestamp}" 
+        return f"{self.event_type} - {self.election.title} - {self.timestamp}"
+    
+    def get_security_info(self):
+        """Get security information for admin display"""
+        return {
+            'event_type': self.event_type,
+            'user_involved': bool(self.user),
+            'ip_address_present': bool(self.ip_address),
+            'event_data_size': len(str(self.event_data)),
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S') if self.timestamp else 'Never',
+            'security_level': 'High' if self.user and self.ip_address else 'Medium'
+        }
+    
+    def is_immutable(self):
+        """Check if this record is immutable (for security)"""
+        return True  # All audit logs are immutable for security 

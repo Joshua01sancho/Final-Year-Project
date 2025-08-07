@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.contrib.auth.models import User
 from apps.elections.models import Election, Candidate, Vote, ElectionResult
-from apps.voters.models import VoterProfile, BiometricData
+from apps.voters.models import VoterProfile, BiometricData, Voter
 from .serializers import (
     ElectionSerializer, CandidateSerializer, VoteSerializer, UserSerializer,
     VoterProfileSerializer, BiometricDataSerializer, ElectionResultSerializer
@@ -14,7 +14,96 @@ from apps.voters.auth import face_service, verify_fingerprint, verify_2fa
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
 from django.utils import timezone
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
 import base64
+
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        
+        if not username or not password:
+            return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Try to authenticate with the custom Voter model
+        user = authenticate(username=username, password=password)
+        if not user:
+            try:
+                user = Voter.objects.get(username=username)
+                if user.check_password(password):
+                    pass
+                else:
+                    user = None
+            except Voter.DoesNotExist:
+                user = None
+        
+        if user:
+            # Check if face registration is completed
+            if not user.face_registration_completed:
+                return Response(
+                    {'error': 'Face registration required. Please complete face registration before logging in.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name
+                }
+            })
+        else:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+class SignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        username = request.data.get('username')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        first_name = request.data.get('firstName')
+        last_name = request.data.get('lastName')
+        
+        if not all([username, email, password]):
+            return Response({'error': 'Username, email, and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user already exists
+        if Voter.objects.filter(username=username).exists():
+            return Response({'error': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if Voter.objects.filter(email=email).exists():
+            return Response({'error': 'Email already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create user
+        user = Voter.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name or '',
+            last_name=last_name or '',
+            face_registration_completed=False  # User must complete face registration
+        )
+        
+        # DO NOT generate tokens - user must complete face registration first
+        return Response({
+            'success': True,
+            'message': 'Account created successfully! Please complete face registration.',
+            'data': {
+                'user_id': user.id,
+                'username': user.username,
+                'email': user.email
+            }
+        }, status=status.HTTP_201_CREATED)
 
 class ElectionViewSet(viewsets.ModelViewSet):
     queryset = Election.objects.all()

@@ -87,7 +87,7 @@ const AnalyticsChart = ({ data, type = 'bar', title, height = 300 }) => {
 };
 
 // Analytics Dashboard Component
-const AnalyticsDashboard = () => {
+function AnalyticsDashboard() {
   const [timeRange, setTimeRange] = useState('7d');
   const [loading, setLoading] = useState(false);
 

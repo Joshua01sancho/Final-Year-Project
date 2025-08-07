@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Menu, X, Shield, User, Settings, LogOut, Bell, Globe, Accessibility, Search, ChevronDown } from 'lucide-react';
+import { Menu, X, Shield, User, Settings, LogOut, Bell, Globe, Accessibility, Search, ChevronDown, UserPlus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthProvider';
 import { useLanguage } from '../../contexts/LanguageProvider';
 import { useAccessibility } from '../../contexts/AccessibilityProvider';
 import Button from './Button';
 
-const Navbar = () => {
+function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -250,7 +250,7 @@ const Navbar = () => {
                 <Button
                   href="/auth/signup"
                   variant="primary"
-                  size="sm"
+                  icon={UserPlus}
                 >
                   Sign Up
                 </Button>

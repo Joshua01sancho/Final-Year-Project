@@ -52,7 +52,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'middleware.audit.AuditMiddleware',
-    'middleware.rate_limit.RateLimitMiddleware',
+    # 'middleware.rate_limit.RateLimitMiddleware',  # Temporarily disabled
 ]
 
 ROOT_URLCONF = 'config.urls'

@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block content_title %}
+    <h1>Election Audit Logs - Immutable Data</h1>
+    <div class="alert alert-warning" style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 12px; margin: 10px 0; border-radius: 4px;">
+        <strong>⚠️ AUDIT TRAIL:</strong> All election audit logs are immutable for security and compliance. Event data, timestamps, and user information cannot be modified to maintain the integrity of the audit trail.
+    </div>
+{% endblock %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+{% endblock %} 

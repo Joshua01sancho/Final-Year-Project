@@ -18,7 +18,7 @@ import AnalyticsChart from '../../components/admin/AnalyticsChart';
 import toast from 'react-hot-toast';
 import PageLayout from '../../components/layout/PageLayout';
 
-const AdminAnalyticsPage = () => {
+function AdminAnalyticsPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [elections, setElections] = useState([]);

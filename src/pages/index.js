@@ -5,7 +5,7 @@ import { Shield, Lock, Users, BarChart3, ArrowRight, Vote, Settings } from 'luci
 import PageLayout from '../components/layout/PageLayout';
 import { useAuth } from '../contexts/AuthProvider';
 
-const HomePage = () => {
+function HomePage() {
   const { user, isAuthenticated } = useAuth();
 
   return (

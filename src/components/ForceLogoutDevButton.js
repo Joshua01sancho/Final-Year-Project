@@ -1,6 +1,13 @@
-import React from "react";
+import React from 'react';
+import { LogOut } from 'lucide-react';
 
-const ForceLogoutDevButton = () => {
+function ForceLogoutDevButton() {
+  const handleForceLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.location.href = '/auth/login';
+  };
+
   // Only show in development (localhost or 127.0.0.1)
   const isDev =
     typeof window !== "undefined" &&
@@ -8,12 +15,6 @@ const ForceLogoutDevButton = () => {
       window.location.hostname === "127.0.0.1");
 
   if (!isDev) return null;
-
-  const handleForceLogout = () => {
-    localStorage.removeItem("auth_token");
-    alert("Auth token cleared! Reloading...");
-    window.location.reload();
-  };
 
   return (
     <button

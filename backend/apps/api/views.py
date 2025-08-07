@@ -45,6 +45,13 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
+        # Check if face registration is completed
+        if not user.face_registration_completed:
+            return Response(
+                {'error': 'Face registration required. Please complete face registration before logging in.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         refresh = RefreshToken.for_user(user)
         
         return Response({
@@ -66,9 +73,10 @@ class SignupView(APIView):
         username = request.data.get('username')
         email = request.data.get('email')
         password = request.data.get('password')
-        first_name = request.data.get('first_name', '')
-        last_name = request.data.get('last_name', '')
-        blockchain_address = request.data.get('blockchain_address', '')
+        # Handle both camelCase and snake_case field names
+        first_name = request.data.get('firstName') or request.data.get('first_name', '')
+        last_name = request.data.get('lastName') or request.data.get('last_name', '')
+        blockchain_address = request.data.get('blockchainAddress') or request.data.get('blockchain_address', '')
         
         if not username or not email or not password:
             return Response(
@@ -78,8 +86,8 @@ class SignupView(APIView):
         
         try:
             with transaction.atomic():
-                # Create user
-                user = User.objects.create_user(
+                # Create user using Voter model (which is the custom user model)
+                user = Voter.objects.create_user(
                     username=username,
                     email=email,
                     password=password,
@@ -87,24 +95,19 @@ class SignupView(APIView):
                     last_name=last_name
                 )
                 
-                # Create voter profile
-                voter = Voter.objects.create(
-                    user=user,
-                    blockchain_address=blockchain_address
-                )
+                # Set blockchain address if provided
+                if blockchain_address:
+                    user.blockchain_address = blockchain_address
+                    user.save()
                 
-                # Generate tokens
-                refresh = RefreshToken.for_user(user)
-                
+                # DO NOT generate tokens - user must complete face registration first
                 return Response({
-                    'access': str(refresh.access_token),
-                    'refresh': str(refresh),
-                    'user': {
-                        'id': user.id,
+                    'success': True,
+                    'message': 'Account created successfully! Please complete face registration.',
+                    'data': {
+                        'user_id': user.id,
                         'username': user.username,
-                        'email': user.email,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
+                        'email': user.email
                     }
                 }, status=status.HTTP_201_CREATED)
                 

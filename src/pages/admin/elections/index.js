@@ -21,7 +21,7 @@ import Footer from '../../../components/common/Footer';
 import toast from 'react-hot-toast';
 import PageLayout from '../../../components/layout/PageLayout';
 
-const AdminElectionsPage = () => {
+function AdminElectionsPage() {
   const { user, isAuthenticated } = useAuth();
   const [elections, setElections] = useState([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -60,11 +60,26 @@ const useAuthStore = create((set, get) => ({
   },
 
   initializeAuth: async () => {
+    console.log('[AuthProvider] initializeAuth called');
     set({ isLoading: true, authError: null });
     let token = null;
     if (typeof window !== 'undefined') {
       token = localStorage.getItem('auth_token');
       console.log('[AuthProvider] initializeAuth: token from localStorage:', token);
+      console.log('[AuthProvider] Current pathname:', window.location.pathname);
+      
+      // Don't auto-login if user is on signup page
+      if (window.location.pathname === '/auth/signup') {
+        console.log('[AuthProvider] User is on signup page, skipping auto-login');
+        set({ 
+          user: null, 
+          isAuthenticated: false, 
+          token: null, 
+          isLoading: false, 
+          authError: null 
+        });
+        return;
+      }
     }
     console.log('Raw token from localStorage:', token);
     

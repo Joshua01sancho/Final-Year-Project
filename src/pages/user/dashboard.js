@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
-import { Vote, Clock, CheckCircle, AlertCircle, User, Settings, Bell, Calendar, RefreshCw, TrendingUp, Users, Award } from 'lucide-react';
+import { Vote, Clock, CheckCircle, AlertCircle, User, Settings, Bell, Calendar, RefreshCw, TrendingUp, Users, Award, Shield } from 'lucide-react';
 import PageLayout from '../../components/layout/PageLayout';
 import { useAuth } from '../../contexts/AuthProvider';
 import BallotCard from '../../components/user/BallotCard';
@@ -11,7 +11,7 @@ import Card from '../../components/common/Card';
 import { LoadingState, SkeletonCard } from '../../components/common/Loading';
 import DashboardStats from '../../components/user/DashboardStats';
 
-const UserDashboard = () => {
+function UserDashboard() {
   const router = useRouter();
   const { user, jwtDebug, authError } = useAuth();
   const [activeTab, setActiveTab] = useState('active');
@@ -153,6 +153,13 @@ const UserDashboard = () => {
               icon={Settings}
             >
               Settings
+            </Button>
+            <Button
+              href="/user/face-auth"
+              variant="outline"
+              icon={Shield}
+            >
+              Face Auth
             </Button>
           </div>
         </div>

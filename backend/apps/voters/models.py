@@ -34,7 +34,7 @@ GANACHE_KEYS = [
 class VoterProfile(models.Model):
     """Extended profile for voters"""
     
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='voter_profile')
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')
     
     # Personal information
     national_id = models.CharField(
@@ -128,7 +128,7 @@ class BiometricData(models.Model):
     data_hash = models.CharField(max_length=64)  # SHA-256 hash of original data
     
     # Azure Face API data (for face recognition)
-    face_id = models.CharField(max_length=100, blank=True, null=True)
+    face_id = models.CharField(max_length=2000, blank=True, null=True)
     face_features = models.JSONField(default=dict, blank=True)
     
     # Metadata
@@ -156,6 +156,20 @@ class BiometricData(models.Model):
     def verify_data_hash(self, original_data):
         """Verify that original data matches stored hash"""
         return self.data_hash == hashlib.sha256(original_data).hexdigest()
+    
+    def get_security_info(self):
+        """Get security information for admin display"""
+        return {
+            'data_integrity': 'Verified' if self.data_hash else 'Not verified',
+            'encrypted_data_size': len(self.encrypted_data) if self.encrypted_data else 0,
+            'face_data_present': bool(self.face_id),
+            'last_modified': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else 'Never',
+            'security_level': 'High' if self.data_hash and self.encrypted_data else 'Low'
+        }
+    
+    def is_immutable(self):
+        """Check if this record is immutable (for security)"""
+        return True  # All biometric data is immutable for security
 
 class AuthenticationLog(models.Model):
     """Model for storing authentication attempts"""
@@ -293,6 +307,8 @@ class Voter(AbstractUser):
     blockchain_address = models.CharField(max_length=42, blank=True, null=True)
     # Add a field to store the user's blockchain private key (for dev/testing only)
     blockchain_private_key = models.CharField(max_length=128, blank=True, null=True)
+    # Add a field to track face registration status
+    face_registration_completed = models.BooleanField(default=False)
     
     groups = models.ManyToManyField(
         'auth.Group',

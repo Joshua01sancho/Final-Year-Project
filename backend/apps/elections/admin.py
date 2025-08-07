@@ -133,8 +133,261 @@ class ElectionAdmin(admin.ModelAdmin):
                 import logging
                 logging.getLogger('audit').error(f"Failed to log election creation: {e}")
 
+# Custom forms for immutable voting data
+from django import forms
+
+class VoteForm(forms.ModelForm):
+    """Custom form for Vote - Read-only for security"""
+    
+    class Meta:
+        model = Vote
+        fields = ['election', 'voter', 'encrypted_vote_data', 'vote_hash', 'blockchain_tx_hash', 
+                 'blockchain_block_number', 'is_valid', 'face_verified', 
+                 'fingerprint_verified', 'two_fa_verified', 'ip_address', 'user_agent']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make all fields read-only for security
+        for field_name in self.fields:
+            self.fields[field_name].widget.attrs['readonly'] = 'readonly'
+            self.fields[field_name].widget.attrs['disabled'] = 'disabled'
+    
+    def save(self, commit=True):
+        # Prevent saving changes to maintain data integrity
+        if self.instance.pk:
+            # If this is an existing record, don't allow modifications
+            return self.instance
+        else:
+            # Only allow creation of new records (though this is disabled in admin)
+            instance = super().save(commit=False)
+            if commit:
+                instance.save()
+            return instance
+
+class ElectionResultForm(forms.ModelForm):
+    """Custom form for ElectionResult - Read-only for security"""
+    
+    class Meta:
+        model = ElectionResult
+        fields = ['election', 'encrypted_total_votes', 'encrypted_candidate_votes', 
+                 'total_votes', 'candidate_results', 'decryption_status']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make all fields read-only for security
+        for field_name in self.fields:
+            self.fields[field_name].widget.attrs['readonly'] = 'readonly'
+            self.fields[field_name].widget.attrs['disabled'] = 'disabled'
+    
+    def save(self, commit=True):
+        # Prevent saving changes to maintain data integrity
+        if self.instance.pk:
+            return self.instance
+        else:
+            instance = super().save(commit=False)
+            if commit:
+                instance.save()
+            return instance
+
+class ElectionAuditLogForm(forms.ModelForm):
+    """Custom form for ElectionAuditLog - Read-only for security"""
+    
+    class Meta:
+        model = ElectionAuditLog
+        fields = ['election', 'event_type', 'event_data', 'user', 'ip_address']
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make all fields read-only for security
+        for field_name in self.fields:
+            self.fields[field_name].widget.attrs['readonly'] = 'readonly'
+            self.fields[field_name].widget.attrs['disabled'] = 'disabled'
+    
+    def save(self, commit=True):
+        # Prevent saving changes to maintain data integrity
+        if self.instance.pk:
+            return self.instance
+        else:
+            instance = super().save(commit=False)
+            if commit:
+                instance.save()
+            return instance
+
+@admin.register(Vote)
+class VoteAdmin(admin.ModelAdmin):
+    form = VoteForm
+    list_display = ('election', 'voter', 'vote_hash', 'is_valid', 'created_at', 'is_confirmed')
+    list_filter = ('election', 'is_valid', 'face_verified', 'fingerprint_verified', 'two_fa_verified', 'created_at')
+    search_fields = ('election__title', 'voter__username', 'vote_hash', 'blockchain_tx_hash')
+    readonly_fields = ('created_at', 'confirmed_at', 'vote_hash', 'encrypted_vote_data', 
+                      'blockchain_tx_hash', 'blockchain_block_number', 'validation_errors', 
+                      'face_verified', 'fingerprint_verified', 'two_fa_verified', 
+                      'ip_address', 'user_agent', 'audit_data')
+    actions = ['view_vote_integrity']
+    
+    def has_add_permission(self, request):
+        """Prevent adding new votes through admin"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deleting votes through admin"""
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """Allow viewing but not editing votes"""
+        return request.method == 'GET'
+    
+    fieldsets = (
+        ('Vote Information', {
+            'fields': ('election', 'voter', 'vote_hash', 'is_valid')
+        }),
+        ('Encrypted Data (Read Only - Immutable)', {
+            'fields': ('encrypted_vote_data',),
+            'classes': ('collapse',),
+            'description': '⚠️ CRITICAL: Encrypted vote data is immutable for voting integrity. Admins can view but cannot modify to maintain election security.'
+        }),
+        ('Blockchain Integration', {
+            'fields': ('blockchain_tx_hash', 'blockchain_block_number'),
+            'classes': ('collapse',),
+            'description': 'Blockchain transaction data (immutable)'
+        }),
+        ('Biometric Verification', {
+            'fields': ('face_verified', 'fingerprint_verified', 'two_fa_verified'),
+            'classes': ('collapse',)
+        }),
+        ('Audit Information', {
+            'fields': ('ip_address', 'user_agent', 'audit_data'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'confirmed_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    @admin.action(description="View vote integrity hash")
+    def view_vote_integrity(self, request, queryset):
+        """Display vote hash for integrity verification"""
+        if queryset.count() == 1:
+            obj = queryset.first()
+            message = f"Vote Hash for {obj.election.title} - {obj.voter.username}: {obj.vote_hash}"
+            self.message_user(request, message, level=messages.INFO)
+        else:
+            self.message_user(request, "Please select exactly one vote to view its hash.", level=messages.WARNING)
+    
+    def get_actions(self, request):
+        """Customize available actions"""
+        actions = super().get_actions(request)
+        # Remove delete action to prevent data loss
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
+@admin.register(ElectionResult)
+class ElectionResultAdmin(admin.ModelAdmin):
+    form = ElectionResultForm
+    list_display = ('election', 'total_votes', 'decryption_status', 'created_at')
+    list_filter = ('decryption_status', 'created_at')
+    search_fields = ('election__title',)
+    readonly_fields = ('created_at', 'updated_at', 'encrypted_total_votes', 'encrypted_candidate_votes',
+                      'total_votes', 'candidate_results', 'trustees_participated', 'decryption_timestamp')
+    actions = ['view_result_integrity']
+    
+    def has_add_permission(self, request):
+        """Prevent adding new results through admin"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deleting results through admin"""
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """Allow viewing but not editing results"""
+        return request.method == 'GET'
+    
+    fieldsets = (
+        ('Election Information', {
+            'fields': ('election', 'decryption_status')
+        }),
+        ('Encrypted Results (Read Only - Immutable)', {
+            'fields': ('encrypted_total_votes', 'encrypted_candidate_votes'),
+            'classes': ('collapse',),
+            'description': '⚠️ CRITICAL: Encrypted election results are immutable for voting integrity. Admins can view but cannot modify to maintain election security.'
+        }),
+        ('Decrypted Results (Read Only)', {
+            'fields': ('total_votes', 'candidate_results'),
+            'classes': ('collapse',),
+            'description': 'Decrypted results (immutable once decrypted)'
+        }),
+        ('Decryption Process', {
+            'fields': ('trustees_participated', 'decryption_timestamp'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    @admin.action(description="View result integrity")
+    def view_result_integrity(self, request, queryset):
+        """Display result information for integrity verification"""
+        if queryset.count() == 1:
+            obj = queryset.first()
+            message = f"Election Result for {obj.election.title}: {obj.total_votes} total votes, Status: {obj.decryption_status}"
+            self.message_user(request, message, level=messages.INFO)
+        else:
+            self.message_user(request, "Please select exactly one result to view its details.", level=messages.WARNING)
+    
+    def get_actions(self, request):
+        """Customize available actions"""
+        actions = super().get_actions(request)
+        # Remove delete action to prevent data loss
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
+@admin.register(ElectionAuditLog)
+class ElectionAuditLogAdmin(admin.ModelAdmin):
+    form = ElectionAuditLogForm
+    list_display = ('election', 'event_type', 'user', 'timestamp')
+    list_filter = ('event_type', 'timestamp', 'election')
+    search_fields = ('election__title', 'event_type', 'user__username')
+    readonly_fields = ('timestamp', 'election', 'event_type', 'event_data', 'user', 'ip_address')
+    
+    def has_add_permission(self, request):
+        """Prevent adding new audit logs through admin"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deleting audit logs through admin"""
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """Allow viewing but not editing audit logs"""
+        return request.method == 'GET'
+    
+    fieldsets = (
+        ('Audit Information', {
+            'fields': ('election', 'event_type', 'event_data')
+        }),
+        ('User and Context', {
+            'fields': ('user', 'ip_address'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('timestamp',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_actions(self, request):
+        """Customize available actions"""
+        actions = super().get_actions(request)
+        # Remove delete action to prevent data loss
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
 admin.site.register(Election, ElectionAdmin)
-admin.site.register(Candidate)
-admin.site.register(Vote)
-admin.site.register(ElectionResult)
-admin.site.register(ElectionAuditLog) 
+admin.site.register(Candidate) 

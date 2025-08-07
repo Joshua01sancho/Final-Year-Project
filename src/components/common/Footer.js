@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Shield, Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 
-const Footer = () => {
+function Footer() {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = {

@@ -37,6 +37,8 @@ class CandidateSerializer(serializers.ModelSerializer):
 
 class ElectionSerializer(serializers.ModelSerializer):
     candidates = CandidateSerializer(many=True, read_only=True)
+    total_votes = serializers.SerializerMethodField()
+    total_voters = serializers.SerializerMethodField()
     
     class Meta:
         model = Election
@@ -44,8 +46,23 @@ class ElectionSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'election_type', 'status', 
             'start_date', 'end_date', 'max_choices', 'allow_abstention',
             'require_2fa', 'require_biometric', 'is_public', 'candidates',
-            'created_at', 'updated_at'
+            'total_votes', 'total_voters', 'created_at', 'updated_at'
         ]
+    
+    def get_total_votes(self, obj):
+        """Get total number of valid votes for this election"""
+        return obj.votes.filter(is_valid=True).count()
+    
+    def get_total_voters(self, obj):
+        """Get total number of eligible voters for this election"""
+        from apps.voters.models import VoterEligibility
+        eligible_voters = VoterEligibility.objects.filter(election=obj, is_eligible=True).count()
+        if eligible_voters == 0:
+            # Fallback to total users in the system
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            return User.objects.count()
+        return eligible_voters
 
 class VoteSerializer(serializers.ModelSerializer):
     class Meta:
